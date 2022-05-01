@@ -48,7 +48,7 @@ contract Tranche is ERC20Permit, ITranche {
             IInterestToken interestTokenTemp,
             // solhint-disable-next-line
             address unused
-        ) = trancheFactory.getData();
+        ) = trancheFactory.getData(); // @note callback avoiding constructor params : CREATE2
         interestToken = interestTokenTemp;
 
         IWrappedPosition wpContract = IWrappedPosition(wpAddress);
@@ -167,21 +167,21 @@ contract Tranche is ERC20Permit, ITranche {
         (
             uint256 shares,
             uint256 usedUnderlying,
-            uint256 balanceBefore
+            uint256 balanceBefore // このコントラクト保有のposition(share)
         ) = position.prefundedDeposit(address(this));
         // The implied current value of the holding of this contract in underlying
         // is the balanceBefore*(usedUnderlying/shares) since (usedUnderlying/shares)
         // is underlying per share and balanceBefore is the balance of this contract
         // in position tokens before this deposit.
-        uint256 holdingsValue = (balanceBefore * usedUnderlying) / shares;
+        uint256 holdingsValue = (balanceBefore * usedUnderlying) / shares; // 暗示される、このコントラクトのunderlying保有量
         // This formula is inputUnderlying - inputUnderlying*interestPerUnderlying
         // Accumulated interest has its value in the interest tokens so we have to mint less
         // principal tokens to account for that.
         // NOTE - If a pool has more than 100% interest in the period this will revert on underflow
         //        The user cannot discount the principal token enough to pay for the outstanding interest accrued.
         (uint256 _valueSupplied, uint256 _interestSupply) = (
-            uint256(valueSupplied),
-            uint256(interestSupply)
+            uint256(valueSupplied), // PTのtotal供給量？？
+            uint256(interestSupply) // このYTのtotal供給量
         );
         // We block deposits in negative interest rate regimes
         // The +2 allows for very small rounding errors which occur when
@@ -194,10 +194,15 @@ contract Tranche is ERC20Permit, ITranche {
         uint256 adjustedAmount;
         // Have to split on the initialization case and negative interest case
         if (_valueSupplied > 0 && holdingsValue > _valueSupplied) {
+            // adjustedAmount: ミントするPTの量
             adjustedAmount =
                 usedUnderlying -
                 ((holdingsValue - _valueSupplied) * usedUnderlying) /
                 _interestSupply;
+            // 第二項 = (uTokenInThisContract - totalSupplyOfPT) * uTokenUsed / totalSupplyOfYT
+            // = earnedInterest * uTokenUsed / totalSupplyOfYT
+            // = earnedInterestPerYT * uTokenUsed 
+            // = 現在までのtermの期間で稼いだ利子
         } else {
             adjustedAmount = usedUnderlying;
         }

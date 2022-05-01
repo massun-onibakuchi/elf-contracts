@@ -98,6 +98,7 @@ abstract contract WrappedPosition is ERC20Permit, IWrappedPosition {
     ///                  senders WP balance before mint)
     /// @dev WARNING - The call which funds this method MUST be in the same transaction
     //                 as the call to this method or you risk loss of funds
+    // @note good implementation: prefund -> mint
     function prefundedDeposit(address _destination)
         external
         override
